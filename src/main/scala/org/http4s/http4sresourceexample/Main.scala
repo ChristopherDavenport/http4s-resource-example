@@ -8,6 +8,7 @@ import org.http4s._
 import org.http4s.client.blaze.PooledHttp1Client
 import org.http4s.dsl.Http4sDsl
 import org.http4s.server.blaze.BlazeBuilder
+import org.http4s.server.middleware.{AutoSlash, GZip, Logger}
 import org.http4s.util._
 
 import scala.concurrent.duration._
@@ -22,7 +23,7 @@ object Main extends StreamApp[IO]{
 
   // Create Server As a Kleisli in Stream[F, ?] consume the requestShutdown to terminate server
   // automatically after 30 seconds
-  def server[F[_]: Effect]: Kleisli[Stream[F, ?], F[Unit], ExitCode] = Kleisli{ shutdown =>
+  def server[F[_]](implicit F: Effect[F]): Kleisli[Stream[F, ?], F[Unit], ExitCode] = Kleisli{ shutdown =>
     for {
       // Global Resources
       scheduler <- Scheduler(5)
@@ -41,13 +42,21 @@ object Main extends StreamApp[IO]{
 
       exitCode <- BlazeBuilder[F]
         .bindHttp(8080, "0.0.0.0")
-        .mountService(services)
+        .mountService(myMiddleWare[F](F)(services))
         .serve
         .concurrently(scheduler.awakeEvery[F](1.milli).to(_.evalMap(timer.set))) // Update Timer Every Millisecond
         .concurrently(scheduler.sleep(30.seconds).evalMap(_ => shutdown)) // Shutdown the Server After 30 Seconds
 
     } yield exitCode
   }
+
+  // Construct Middleware via Composition
+  def myMiddleWare[F[_]](implicit F: Effect[F]) =
+  {httpService: HttpService[F] => GZip(httpService)(F)} compose
+    {httpService : HttpService[F] => Logger(true, true)(httpService)(F)} compose
+    {httpService : HttpService[F] => AutoSlash(httpService)(F)}
+
+
 
   def counterService[F[_]: Effect](counter: async.Ref[F, Int]): HttpService[F] = {
     object dsl extends Http4sDsl[F]
