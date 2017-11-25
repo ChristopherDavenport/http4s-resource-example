@@ -24,10 +24,9 @@ object Main extends StreamApp[IO]{
   // automatically after 30 seconds
   def server[F[_]: Effect]: Kleisli[Stream[F, ?], F[Unit], ExitCode] = Kleisli{ shutdown =>
     for {
-
       // Global Resources
       scheduler <- Scheduler(5)
-      // Bracket Resources the need to be terminated on server shutdown to ensure they are gracefully handled.
+      // Bracket Resources that need to be terminated on server shutdown to ensure they are gracefully handled.
       client <- Stream.bracket(PooledHttp1Client().pure[F])(Stream.emit(_).covary[F], _.shutdown)
 
       // Service Resources
