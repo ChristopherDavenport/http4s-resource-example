@@ -1,5 +1,6 @@
 package org.http4s.http4sresourceexample
 
+import cats.data.Kleisli
 import cats.implicits._
 import cats.effect._
 import fs2._
@@ -14,27 +15,33 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 object Main extends StreamApp[IO]{
 
+  // Concrete Server in type IO[_] for StreamApp - Only Passes Required Values to the Kleisli
   def stream(args: List[String], requestShutdown: IO[Unit]): Stream[IO, ExitCode] = {
-    server[IO]
+    server[IO].run(requestShutdown)
   }
 
-  def server[F[_]: Effect]: Stream[F, ExitCode] = {
+  // Create Server As a Kleisli in Stream[F, ?] consume the requestShutdown to terminate server
+  // automatically after 30 seconds
+  def server[F[_]: Effect]: Kleisli[Stream[F, ?], F[Unit], ExitCode] = Kleisli{ shutdown =>
     for {
 
+      // Global Resources
       scheduler <- Scheduler(5)
+      // Bracket Resources the need to be terminated on server shutdown to ensure they are gracefully handled.
       client <- Stream.bracket(PooledHttp1Client().pure[F])(Stream.emit(_).covary[F], _.shutdown)
 
+      // Service Resources
       timer <- Stream.eval(async.signalOf[F, FiniteDuration](0.seconds))
       counter <- Stream.eval(async.refOf[F, Int](0))
 
+      services = counterService[F](counter) <+> timerService[F](timer) // Combine Services
+
       exitCode <- BlazeBuilder[F]
         .bindHttp(8080, "0.0.0.0")
-        .mountService(
-          counterService[F](counter) <+>
-            timerService[F](timer)
-        )
+        .mountService(services)
         .serve
-        .concurrently(scheduler.awakeEvery[F](1.milli).to(_.evalMap(timer.set)))
+        .concurrently(scheduler.awakeEvery[F](1.milli).to(_.evalMap(timer.set))) // Update Timer Every Millisecond
+        .concurrently(scheduler.sleep(30.seconds).evalMap(_ => shutdown)) // Shutdown the Server After 30 Seconds
 
     } yield exitCode
   }
@@ -44,7 +51,7 @@ object Main extends StreamApp[IO]{
     import dsl._
     HttpService{
       case GET -> Root / "counter" =>
-        counter.modify(_ + 1).flatMap(change => Ok(change.now.show))
+        counter.modify(_ + 1).flatMap(change => Ok(show"Counter - ${change.now}"))
     }
   }
 
