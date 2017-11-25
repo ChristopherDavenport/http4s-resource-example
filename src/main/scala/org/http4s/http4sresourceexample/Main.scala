@@ -29,11 +29,15 @@ object Main extends StreamApp[IO]{
       // Bracket Resources that need to be terminated on server shutdown to ensure they are gracefully handled.
       client <- Stream.bracket(PooledHttp1Client().pure[F])(Stream.emit(_).covary[F], _.shutdown)
 
-      // Service Resources
+      // Service Resources - Needed in multiple locations.
       timer <- Stream.eval(async.signalOf[F, FiniteDuration](0.seconds))
-      counter <- Stream.eval(async.refOf[F, Int](0))
 
-      services = counterService[F](counter) <+> timerService[F](timer) // Combine Services
+      // Service Built With Non Leaking Resource F[HttpService[F]]
+      // This can be done in a function so the main comprehension never sees it.
+      counterServ <- Stream.eval(async.refOf[F, Int](0).map(counterService[F]))
+
+      // Compose Services
+      services = counterServ <+> timerService[F](timer)
 
       exitCode <- BlazeBuilder[F]
         .bindHttp(8080, "0.0.0.0")
