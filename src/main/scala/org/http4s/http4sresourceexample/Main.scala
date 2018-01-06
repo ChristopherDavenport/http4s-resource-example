@@ -5,11 +5,10 @@ import cats.implicits._
 import cats.effect._
 import fs2._
 import org.http4s._
-import org.http4s.client.blaze.PooledHttp1Client
+import org.http4s.client.blaze.Http1Client
 import org.http4s.dsl.Http4sDsl
 import org.http4s.server.blaze.BlazeBuilder
 import org.http4s.server.middleware.{AutoSlash, GZip, Logger}
-import org.http4s.util._
 
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -17,18 +16,18 @@ import scala.concurrent.ExecutionContext.Implicits.global
 object Main extends StreamApp[IO]{
 
   // Concrete Server in type IO[_] for StreamApp - Only Passes Required Values to the Kleisli
-  def stream(args: List[String], requestShutdown: IO[Unit]): Stream[IO, ExitCode] = {
+  def stream(args: List[String], requestShutdown: IO[Unit]): Stream[IO, StreamApp.ExitCode] = {
     server[IO].run(requestShutdown)
   }
 
   // Create Server As a Kleisli in Stream[F, ?] consume the requestShutdown to terminate server
   // automatically after 30 seconds
-  def server[F[_]](implicit F: Effect[F]): Kleisli[Stream[F, ?], F[Unit], ExitCode] = Kleisli{ shutdown =>
+  def server[F[_]](implicit F: Effect[F]): Kleisli[Stream[F, ?], F[Unit], StreamApp.ExitCode] = Kleisli{ shutdown =>
     for {
       // Global Resources
       scheduler <- Scheduler(5)
       // Bracket Resources that need to be terminated on server shutdown to ensure they are gracefully handled.
-      client <- Stream.bracket(PooledHttp1Client().pure[F])(Stream.emit(_).covary[F], _.shutdown)
+      client <- Http1Client.stream[F]()
 
       // Service Resources - Needed in multiple locations.
       timer <- Stream.eval(async.signalOf[F, FiniteDuration](0.seconds))
