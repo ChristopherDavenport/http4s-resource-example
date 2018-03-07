@@ -1,6 +1,5 @@
 package org.http4s.http4sresourceexample
 
-import cats.data.Kleisli
 import cats.implicits._
 import cats.effect._
 import fs2._
@@ -17,12 +16,12 @@ object Main extends StreamApp[IO]{
 
   // Concrete Server in type IO[_] for StreamApp - Only Passes Required Values to the Kleisli
   def stream(args: List[String], requestShutdown: IO[Unit]): Stream[IO, StreamApp.ExitCode] = {
-    server[IO].run(requestShutdown)
+    server[IO](requestShutdown)
   }
 
   // Create Server As a Kleisli in Stream[F, ?] consume the requestShutdown to terminate server
   // automatically after 30 seconds
-  def server[F[_]](implicit F: Effect[F]): Kleisli[Stream[F, ?], F[Unit], StreamApp.ExitCode] = Kleisli{ shutdown =>
+  def server[F[_]](shutdown: F[Unit])(implicit F: Effect[F]): Stream[F, StreamApp.ExitCode] = {
     for {
       // Global Resources
       scheduler <- Scheduler(5)
