@@ -1,6 +1,5 @@
 package org.http4s.http4sresourceexample
 
-import cats.data.Kleisli
 import cats.implicits._
 import cats.effect._
 import fs2._
