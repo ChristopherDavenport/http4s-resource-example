@@ -21,9 +21,9 @@ lazy val commonSettings = Seq(
 
   libraryDependencies ++= Seq(
 
-    "org.http4s"                  %% "http4s-dsl"                 % "0.18.24",
-    "org.http4s"                  %% "http4s-blaze-server"        % "0.18.24",
-    "org.http4s"                  %% "http4s-blaze-client"        % "0.18.24",
+    "org.http4s"                  %% "http4s-dsl"                 % "0.18.26",
+    "org.http4s"                  %% "http4s-blaze-server"        % "0.18.26",
+    "org.http4s"                  %% "http4s-blaze-client"        % "0.18.26",
 //    "org.http4s"                  %% "http4s-circe"               % "0.18.0-M5",
 
     "ch.qos.logback"              % "logback-classic"             % "1.2.3",
