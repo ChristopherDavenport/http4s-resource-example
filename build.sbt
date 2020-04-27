@@ -28,6 +28,6 @@ lazy val commonSettings = Seq(
 
     "ch.qos.logback"              % "logback-classic"             % "1.2.3",
 
-    "org.specs2"                  %% "specs2-core"                % "4.6.0"       % Test,
+    "org.specs2"                  %% "specs2-core"                % "4.9.4"       % Test,
   )
 )
